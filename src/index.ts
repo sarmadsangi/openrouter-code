@@ -2,6 +2,7 @@ export { ConfigManager } from './config';
 export { ConversationManager } from './conversation-manager';
 export { OpenRouterClient } from './openrouter-client';
 export { ToolManager } from './tools/tool-manager';
+export { TaskPlanner } from './task-planner';
 export * from './types';
 
 // Re-export tools
