@@ -77,4 +77,11 @@ Available tools: Read, Write, Bash, Grep, Search, WebSearch`;
       baseUrl: process.env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1'
     };
   }
+
+  getContextLimits() {
+    return {
+      maxTokens: parseInt(process.env.MAX_CONTEXT_TOKENS || '200000'),
+      targetTokens: parseInt(process.env.TARGET_CONTEXT_TOKENS || '100000')
+    };
+  }
 }

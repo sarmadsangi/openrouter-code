@@ -58,9 +58,14 @@ async function startChatSession(options: any) {
     
     console.log(chalk.blue('🤖 OpenRouter Code Assistant'));
     console.log(chalk.gray('Task Planning: Automatic breakdown of complex requests'));
+    console.log(chalk.gray('Context Management: Optimized for 100k-200k token window'));
     console.log(chalk.gray('Type "exit" to quit, "help" for commands, "reset" to start over'));
     console.log(chalk.gray(`Current model: ${conversationManager.getCurrentModel()}`));
     console.log(chalk.gray(`Available tools: ${conversationManager.getAvailableTools().join(', ')}`));
+    
+    // Show initial context status
+    const contextWindow = conversationManager.getContextWindow();
+    console.log(chalk.gray(`Context: ${contextWindow.currentTokens}/${contextWindow.targetTokens} tokens (${contextWindow.utilizationPercentage.toFixed(1)}%)`));
     console.log();
 
     while (true) {
@@ -96,6 +101,16 @@ async function startChatSession(options: any) {
 
       if (input.toLowerCase() === 'models') {
         await showCurrentModels(conversationManager);
+        continue;
+      }
+
+      if (input.toLowerCase() === 'context') {
+        console.log(chalk.cyan('Context Information:'));
+        const contextInfo = conversationManager.getContextWindow();
+        const status = contextInfo.utilizationPercentage > 80 ? '🔴' : 
+                      contextInfo.utilizationPercentage > 60 ? '🟡' : '🟢';
+        console.log(`${status} ${contextInfo.currentTokens.toLocaleString()}/${contextInfo.targetTokens.toLocaleString()} tokens (${contextInfo.utilizationPercentage.toFixed(1)}%)`);
+        console.log();
         continue;
       }
 
@@ -141,9 +156,11 @@ function showHelp(conversationManager: ConversationManager) {
   console.log(chalk.white('  reset     - Reset conversation'));
   console.log(chalk.white('  status    - Show conversation status'));
   console.log(chalk.white('  models    - Show current model configuration'));
+  console.log(chalk.white('  context   - Show context window utilization'));
   console.log(chalk.white('  /plan     - Create a task plan for complex requests'));
   console.log(chalk.white('  /continue - Continue current task plan'));
   console.log(chalk.white('  /status   - Show task plan status'));
+  console.log(chalk.white('  /context  - Detailed context analysis'));
   console.log(chalk.white('  yes/no    - Approve or cancel task execution'));
   console.log();
   console.log(chalk.blue('🛠  Available Tools:'));
@@ -153,6 +170,11 @@ function showHelp(conversationManager: ConversationManager) {
   console.log(chalk.white('  The assistant can automatically break down complex requests'));
   console.log(chalk.white('  into manageable tasks and execute them step by step.'));
   console.log();
+  console.log(chalk.blue('🧠 Context Management:'));
+  console.log(chalk.white('  Target: 100k tokens for optimal performance'));
+  console.log(chalk.white('  Maximum: 200k tokens with automatic compression'));
+  console.log(chalk.white('  Smart prioritization of relevant code and content'));
+  console.log();
 }
 
 function showStatus(conversationManager: ConversationManager) {
@@ -160,6 +182,12 @@ function showStatus(conversationManager: ConversationManager) {
   console.log(chalk.white(`  Turn count: ${conversationManager.getTurnCount()}`));
   console.log(chalk.white(`  Current model: ${conversationManager.getCurrentModel()}`));
   console.log(chalk.white(`  Available tools: ${conversationManager.getAvailableTools().join(', ')}`));
+  
+  // Context information
+  const contextWindow = conversationManager.getContextWindow();
+  const contextStatus = contextWindow.utilizationPercentage > 80 ? '🔴 High' : 
+                       contextWindow.utilizationPercentage > 60 ? '🟡 Medium' : '🟢 Good';
+  console.log(chalk.white(`  Context usage: ${contextWindow.currentTokens.toLocaleString()}/${contextWindow.targetTokens.toLocaleString()} tokens (${contextWindow.utilizationPercentage.toFixed(1)}%) ${contextStatus}`));
   
   const plan = conversationManager.getCurrentPlan();
   if (plan) {

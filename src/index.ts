@@ -3,6 +3,7 @@ export { ConversationManager } from './conversation-manager';
 export { OpenRouterClient } from './openrouter-client';
 export { ToolManager } from './tools/tool-manager';
 export { TaskPlanner } from './task-planner';
+export { ContextManager } from './context-manager';
 export * from './types';
 
 // Re-export tools

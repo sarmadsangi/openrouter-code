@@ -3,6 +3,7 @@ import { ConfigManager } from './config';
 import { OpenRouterClient } from './openrouter-client';
 import { ToolManager } from './tools/tool-manager';
 import { TaskPlanner, TaskPlan, Task } from './task-planner';
+import { ContextManager, ContextWindow } from './context-manager';
 
 export class ConversationManager {
   private conversation: Conversation;
@@ -10,6 +11,7 @@ export class ConversationManager {
   private openRouterClient: OpenRouterClient;
   private toolManager: ToolManager;
   private taskPlanner: TaskPlanner;
+  private contextManager: ContextManager;
   private requiresApproval: boolean = true;
 
   constructor(configManager: ConfigManager) {
@@ -17,6 +19,10 @@ export class ConversationManager {
     this.openRouterClient = new OpenRouterClient(configManager);
     this.toolManager = new ToolManager(configManager.getConfig().allowedTools);
     this.taskPlanner = new TaskPlanner(configManager, this.toolManager);
+    
+    // Initialize context manager with conservative limits for reduced hallucinations
+    const contextLimits = configManager.getContextLimits();
+    this.contextManager = new ContextManager(contextLimits.maxTokens, contextLimits.targetTokens);
     
     this.conversation = {
       messages: [{
@@ -49,6 +55,10 @@ export class ConversationManager {
       return this.getTaskStatus();
     }
 
+    if (input.toLowerCase() === '/context') {
+      return this.getContextStatus();
+    }
+
     // Add user message
     this.conversation.messages.push({
       role: 'user',
@@ -56,6 +66,9 @@ export class ConversationManager {
     });
 
     try {
+      // Context management - check if we need to compress or truncate
+      await this.manageContext();
+
       // Check if this looks like a complex task that needs planning
       if (this.shouldCreateTaskPlan(input)) {
         return await this.handleComplexTask(input);
@@ -65,7 +78,7 @@ export class ConversationManager {
       const taskType = this.openRouterClient.determineTaskType(input);
       this.conversation.currentModel = this.configManager.getModelForTask(taskType);
 
-      // Get AI response
+      // Get AI response with managed context
       let response = await this.openRouterClient.chat(
         this.conversation.messages,
         taskType
@@ -81,6 +94,13 @@ export class ConversationManager {
       });
 
       this.conversation.turnCount++;
+      
+      // Add context info to response if context is getting high
+      const contextInfo = this.getContextWarning();
+      if (contextInfo) {
+        response += `\n\n${contextInfo}`;
+      }
+
       return response;
 
     } catch (error: any) {
@@ -329,5 +349,134 @@ Available tools: ${this.toolManager.getAvailableTools().join(', ')}
 
   async listAvailableModels(): Promise<any[]> {
     return await this.openRouterClient.getAvailableModels();
+  }
+
+  // Context Management Methods
+  private async manageContext(): Promise<void> {
+    if (this.contextManager.shouldTruncate(this.conversation.messages)) {
+      console.log('🚨 Context window critical - performing emergency truncation');
+      const { truncatedMessages, removedCount } = this.contextManager.truncateMessages(this.conversation.messages);
+      this.conversation.messages = truncatedMessages;
+      console.log(`Removed ${removedCount} old messages to stay within context limit`);
+    } else if (this.contextManager.shouldCompress(this.conversation.messages)) {
+      console.log('💡 Context window getting full - compressing conversation');
+      try {
+        const { compressedMessages, summary } = await this.contextManager.compressConversation(
+          this.conversation.messages,
+          (messages) => this.openRouterClient.chat(messages, 'reasoning')
+        );
+        this.conversation.messages = compressedMessages;
+        console.log(`Compressed ${summary.messagesCompressed} messages, saved ${summary.tokensSaved} tokens`);
+      } catch (error) {
+        console.warn('Failed to compress conversation, falling back to truncation');
+        const { truncatedMessages } = this.contextManager.truncateMessages(this.conversation.messages);
+        this.conversation.messages = truncatedMessages;
+      }
+    }
+  }
+
+  private getContextStatus(): string {
+    const contextInfo = this.contextManager.getContextInfo(this.conversation.messages);
+    const recommendations = this.contextManager.getRecommendedActions(this.conversation.messages);
+    
+    let status = `📊 **Context Status**\n\n${contextInfo}\n`;
+    
+    if (recommendations.length > 0) {
+      status += `\n**Recommendations:**\n${recommendations.map(r => `- ${r}`).join('\n')}`;
+    }
+    
+    const context = this.contextManager.calculateContextWindow(this.conversation.messages);
+    status += `\n\n**Details:**`;
+    status += `\n- Messages: ${this.conversation.messages.length}`;
+    status += `\n- Current tokens: ${context.currentTokens.toLocaleString()}`;
+    status += `\n- Target limit: ${context.targetTokens.toLocaleString()}`;
+    status += `\n- Max limit: ${context.maxTokens.toLocaleString()}`;
+    status += `\n- Utilization: ${context.utilizationPercentage.toFixed(1)}%`;
+    
+    return status;
+  }
+
+  private getContextWarning(): string | null {
+    const context = this.contextManager.calculateContextWindow(this.conversation.messages);
+    
+    if (context.utilizationPercentage > 80) {
+      return `⚠️ Context window is ${context.utilizationPercentage.toFixed(1)}% full. Consider using '/context' to check status or start a new conversation for better performance.`;
+    } else if (context.utilizationPercentage > 60) {
+      return `💡 Context window is ${context.utilizationPercentage.toFixed(1)}% full. This conversation will be automatically managed to maintain performance.`;
+    }
+    
+    return null;
+  }
+
+  // Enhanced tool processing with context awareness
+  private async processToolCallsWithContext(response: string, userQuery: string): Promise<string> {
+    const toolResults: string[] = [];
+    const toolCallPattern = /\[TOOL:(\w+)\](.*?)\[\/TOOL\]/gs;
+    let match;
+
+    while ((match = toolCallPattern.exec(response)) !== null) {
+      const toolName = match[1] as any;
+      const toolParams = this.parseToolParameters(match[2]);
+      
+      try {
+        const result = await this.toolManager.executeTool(toolName, toolParams);
+        
+        if (result.success && result.result) {
+          // Apply context-aware processing to tool results
+          const managedResult = this.applyContextLimitsToToolResult(result.result, userQuery);
+          toolResults.push(`[TOOL RESULT: ${toolName}]\n${managedResult}\n[/TOOL RESULT]`);
+        } else {
+          toolResults.push(`[TOOL ERROR: ${toolName}]\n${result.error}\n[/TOOL ERROR]`);
+        }
+        
+        // Replace the tool call with the result
+        response = response.replace(match[0], toolResults[toolResults.length - 1]);
+      } catch (error: any) {
+        const errorResult = `[TOOL ERROR: ${toolName}]\nFailed to execute: ${error.message}\n[/TOOL ERROR]`;
+        toolResults.push(errorResult);
+        response = response.replace(match[0], errorResult);
+      }
+    }
+
+    return response;
+  }
+
+  private applyContextLimitsToToolResult(result: string, userQuery: string): string {
+    const maxToolResultTokens = 10000; // Limit individual tool results
+    const resultTokens = this.contextManager.estimateTokens(result);
+    
+    if (resultTokens <= maxToolResultTokens) {
+      return result;
+    }
+
+    // If result is too large, try to prioritize relevant content
+    const lines = result.split('\n');
+    
+    // For code files, prioritize based on user query
+    if (userQuery && lines.length > 50) {
+      const prioritizedContent = this.contextManager.prioritizeFileContent(
+        [result], 
+        userQuery, 
+        maxToolResultTokens
+      );
+      
+      if (prioritizedContent.length > 0) {
+        return prioritizedContent[0] + '\n\n[... content truncated for context management ...]';
+      }
+    }
+    
+    // Simple truncation as fallback
+    const targetLength = Math.floor(result.length * (maxToolResultTokens / resultTokens));
+    return result.substring(0, targetLength) + '\n\n[... content truncated for context management ...]';
+  }
+
+  // Update context limits
+  updateContextLimits(maxTokens: number, targetTokens: number): void {
+    this.contextManager.updateLimits(maxTokens, targetTokens);
+  }
+
+  // Get current context window info
+  getContextWindow(): ContextWindow {
+    return this.contextManager.calculateContextWindow(this.conversation.messages);
   }
 }
