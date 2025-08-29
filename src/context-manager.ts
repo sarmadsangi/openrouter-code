@@ -1,4 +1,5 @@
 import { Message } from './types';
+import { blueprintLoader, BlueprintContent } from './blueprint-loader';
 
 export interface ContextWindow {
   maxTokens: number;
@@ -17,10 +18,47 @@ export class ContextManager {
   private maxContextTokens: number;
   private targetContextTokens: number;
   private readonly tokenBuffer: number = 5000; // Safety buffer
+  private workingDirectory?: string;
 
-  constructor(maxTokens: number = 200000, targetTokens: number = 100000) {
+  constructor(maxTokens: number = 200000, targetTokens: number = 100000, workingDirectory?: string) {
     this.maxContextTokens = maxTokens;
     this.targetContextTokens = targetTokens;
+    this.workingDirectory = workingDirectory;
+  }
+
+  /**
+   * Sets the working directory for blueprint loading
+   */
+  setWorkingDirectory(directory: string): void {
+    this.workingDirectory = directory;
+    // Invalidate blueprint cache when directory changes
+    blueprintLoader.invalidateCache();
+  }
+
+  /**
+   * Gets the current working directory
+   */
+  getWorkingDirectory(): string | undefined {
+    return this.workingDirectory;
+  }
+
+  /**
+   * Loads and returns blueprint context if available
+   */
+  async getBlueprintContext(): Promise<string> {
+    try {
+      return await blueprintLoader.getBlueprintContext(this.workingDirectory);
+    } catch (error) {
+      console.warn('Failed to load blueprint:', error);
+      return '';
+    }
+  }
+
+  /**
+   * Checks if a blueprint exists in the current working directory
+   */
+  blueprintExists(): boolean {
+    return blueprintLoader.blueprintExists(this.workingDirectory);
   }
 
   // Rough token estimation - approximately 4 characters per token for English

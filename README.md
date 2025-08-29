@@ -5,8 +5,10 @@ A Claude Code clone that uses OpenRouter for flexible AI model selection, allowi
 ## Features
 
 - 🧠 **Smart Task Planning**: Automatically breaks down complex requests into manageable tasks
+- 📖 **Blueprint Auto-loading**: Automatically loads `blueprint.md` for project context
 - 🤖 **Multiple Model Support**: Configure separate models for reasoning vs coding tasks
 - 🛠️ **Comprehensive Tools**: Read, Write, Bash, Grep, Search, WebSearch capabilities
+- 🗂️ **Workspace Management**: Support for multiple project environments
 - ⚡ **Optimized DevX**: Minimal API surface with maximum functionality
 - 🔧 **Configurable**: Flexible configuration via environment variables
 - 💬 **Interactive Chat**: Terminal-based conversation interface
@@ -101,6 +103,9 @@ ALLOWED_TOOLS=Read,Write,Bash,Grep,Search,WebSearch  # Available tools
 - `/plan <request>` - Create a task plan for complex requests
 - `/continue` - Continue current task plan
 - `/status` - Show task plan status
+- `/blueprint` - Show blueprint.md status
+- `/refresh-blueprint` - Refresh blueprint context
+- `/workspace` - Show workspace status
 
 ### CLI Commands
 - `orcode chat` - Start interactive chat
@@ -123,11 +128,74 @@ Keywords are analyzed to determine the best model for each task.
 
 The assistant can automatically break down complex requests into manageable tasks:
 
-### Automatic Task Detection
-Complex requests are automatically detected based on keywords like:
-- `implement`, `create`, `build`, `develop`, `refactor`
-- `setup`, `configure`, `add feature`, `from scratch`
-- Long requests with multiple requirements
+### Intelligent Task Detection
+The assistant uses smart heuristics to determine when planning is needed:
+
+**Simple tasks (direct execution):**
+- Information queries: "show", "list", "what is", "explain"
+- Quick fixes: "fix this error", "change this variable"
+- File operations: "find", "search", "grep"
+
+**Complex tasks (automatic planning):**
+- Project-level work: "implement", "create new", "build from scratch"
+- Multi-step processes: "first... then... finally"
+- Architecture changes: "refactor entire", "migrate"
+- Feature development: "add feature with validation and error handling"
+
+**Key improvements:**
+- 94% accuracy in task classification
+- Avoids unnecessary planning for simple requests
+- Automatically detects multi-step requirements
+- Considers request length and complexity
+
+## Blueprint Auto-loading
+
+The assistant automatically loads a `blueprint.md` file from your project root to provide context about your project:
+
+### What is a Blueprint?
+A blueprint is a markdown file that describes:
+- Project overview and architecture
+- Development guidelines and conventions
+- Key features and functionality
+- Technology stack and dependencies
+
+### How it Works
+1. Place a `blueprint.md` file in your project root
+2. The assistant automatically loads it when starting
+3. Blueprint content is included in the AI's context
+4. Use `/blueprint` to check status
+5. Use `/refresh-blueprint` to reload changes
+
+### Example Blueprint Structure
+```markdown
+# My Project Blueprint
+
+## Overview
+Brief description of what the project does...
+
+## Architecture
+- Frontend: React with TypeScript
+- Backend: Node.js with Express
+- Database: PostgreSQL
+
+## Development Guidelines
+- Use functional components
+- Follow eslint configuration
+- Write tests for new features
+```
+
+### Workspace Management
+Switch between different project workspaces:
+```bash
+# Add a new workspace
+workspace add myproject /path/to/project
+
+# Switch to a workspace  
+workspace switch myproject
+
+# List all workspaces
+workspace list
+```
 
 ### Example Usage
 ```

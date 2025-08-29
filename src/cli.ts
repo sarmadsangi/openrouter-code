@@ -170,6 +170,9 @@ function showHelp(conversationManager: ConversationManager) {
   console.log(chalk.white('  /continue - Continue current task plan'));
   console.log(chalk.white('  /status   - Show task plan status'));
   console.log(chalk.white('  /context  - Detailed context analysis'));
+  console.log(chalk.white('  /blueprint - Show blueprint.md status'));
+  console.log(chalk.white('  /refresh-blueprint - Refresh blueprint context'));
+  console.log(chalk.white('  /workspace - Show workspace status'));
   console.log(chalk.white('  yes/no    - Approve or cancel task execution'));
   console.log();
   console.log(chalk.blue('🛠  Available Tools:'));
