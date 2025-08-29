@@ -59,6 +59,24 @@ Or use the built version:
 npm start chat
 ```
 
+## How to Configure Models
+
+### Option 1: Interactive Configuration
+```bash
+npm run dev -- configure-models
+```
+
+### Option 2: CLI Command
+```bash
+orcode configure-models
+```
+
+### Option 3: Manual .env Configuration
+Edit your `.env` file with your preferred models:
+- **REASONING_MODEL**: For analysis, planning, architecture (e.g., `anthropic/claude-3.5-sonnet`)
+- **CODING_MODEL**: For implementation, debugging, refactoring (e.g., `anthropic/claude-3.5-sonnet`)  
+- **FALLBACK_MODEL**: For general queries and backup (e.g., `openai/gpt-4`)
+
 ## Configuration
 
 The assistant supports the following configuration options:
