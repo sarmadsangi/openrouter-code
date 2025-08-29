@@ -114,6 +114,14 @@ async function startChatSession(options: any) {
         continue;
       }
 
+      if (input.toLowerCase() === 'usage') {
+        console.log(chalk.cyan('Usage Information:'));
+        const usageReport = conversationManager.getUsageTracker().formatUsageDisplay();
+        console.log(usageReport);
+        console.log();
+        continue;
+      }
+
       if (input.toLowerCase().startsWith('yes') || input.toLowerCase().startsWith('approve')) {
         const result = await conversationManager.handleApproval(true);
         console.log(chalk.cyan('Assistant:'));
@@ -157,6 +165,7 @@ function showHelp(conversationManager: ConversationManager) {
   console.log(chalk.white('  status    - Show conversation status'));
   console.log(chalk.white('  models    - Show current model configuration'));
   console.log(chalk.white('  context   - Show context window utilization'));
+  console.log(chalk.white('  usage     - Show detailed usage statistics'));
   console.log(chalk.white('  /plan     - Create a task plan for complex requests'));
   console.log(chalk.white('  /continue - Continue current task plan'));
   console.log(chalk.white('  /status   - Show task plan status'));

@@ -2,6 +2,16 @@ import axios, { AxiosInstance } from 'axios';
 import { ConfigManager } from './config';
 import { Message, OpenRouterResponse, TaskType } from './types';
 
+export interface ChatResponse {
+  content: string;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  model: string;
+}
+
 export class OpenRouterClient {
   private client: AxiosInstance;
   private configManager: ConfigManager;
@@ -28,7 +38,7 @@ export class OpenRouterClient {
   async chat(
     messages: Message[], 
     taskType: 'reasoning' | 'coding' | 'general' = 'general'
-  ): Promise<string> {
+  ): Promise<ChatResponse> {
     const config = this.configManager.getConfig();
     const model = this.configManager.getModelForTask(taskType);
 
@@ -46,7 +56,11 @@ export class OpenRouterClient {
         throw new Error('No response from OpenRouter');
       }
 
-      return choice.message.content;
+      return {
+        content: choice.message.content,
+        usage: response.data.usage,
+        model: response.data.model
+      };
     } catch (error: any) {
       console.error('OpenRouter API Error:', error.response?.data || error.message);
       
@@ -60,7 +74,7 @@ export class OpenRouterClient {
     }
   }
 
-  private async chatWithModel(messages: Message[], model: string): Promise<string> {
+  private async chatWithModel(messages: Message[], model: string): Promise<ChatResponse> {
     const config = this.configManager.getConfig();
     
     const response = await this.client.post<OpenRouterResponse>('/chat/completions', {
@@ -76,7 +90,11 @@ export class OpenRouterClient {
       throw new Error('No response from fallback model');
     }
 
-    return choice.message.content;
+    return {
+      content: choice.message.content,
+      usage: response.data.usage,
+      model: response.data.model
+    };
   }
 
   async getAvailableModels(): Promise<any[]> {
