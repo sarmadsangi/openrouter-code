@@ -1,15 +1,36 @@
-export { ConfigManager } from './config';
-export { ConversationManager } from './conversation-manager';
-export { OpenRouterClient } from './openrouter-client';
-export { ToolManager } from './tools/tool-manager';
-export { TaskPlanner } from './task-planner';
-export { ContextManager } from './context-manager';
-export * from './types';
+// Main export file for the workspace manager
+export { WorkspaceManager, workspaceManager, type WorkspaceConfig } from './config/workspace-config';
+import { workspaceManager } from './config/workspace-config';
 
-// Re-export tools
-export { ReadTool } from './tools/read-tool';
-export { WriteTool } from './tools/write-tool';
-export { BashTool } from './tools/bash-tool';
-export { GrepTool } from './tools/grep-tool';
-export { SearchTool } from './tools/search-tool';
-export { WebSearchTool } from './tools/web-search-tool';
+// Helper functions for quick operations
+export const workspace = {
+  /**
+   * Quick switch to a workspace
+   */
+  switch: (name: string) => workspaceManager.switchToWorkspace(name),
+  
+  /**
+   * Quick add workspace
+   */
+  add: (name: string, path: string) => workspaceManager.setWorkingDirectory(name, path),
+  
+  /**
+   * Get current workspace info
+   */
+  current: () => workspaceManager.getCurrentWorkspace(),
+  
+  /**
+   * List all workspaces
+   */
+  list: () => workspaceManager.listWorkspaces(),
+  
+  /**
+   * Remove workspace
+   */
+  remove: (name: string) => workspaceManager.removeWorkingDirectory(name),
+  
+  /**
+   * Detect project directories
+   */
+  detect: () => workspaceManager.detectProjectDirectories()
+};
