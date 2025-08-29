@@ -1,9 +1,10 @@
 import { Message, Conversation, ToolCall } from './types';
 import { ConfigManager } from './config';
-import { OpenRouterClient } from './openrouter-client';
+import { OpenRouterClient, ChatResponse } from './openrouter-client';
 import { ToolManager } from './tools/tool-manager';
 import { TaskPlanner, TaskPlan, Task } from './task-planner';
 import { ContextManager, ContextWindow } from './context-manager';
+import { UsageTracker } from './usage-tracker';
 
 export class ConversationManager {
   private conversation: Conversation;
@@ -12,6 +13,7 @@ export class ConversationManager {
   private toolManager: ToolManager;
   private taskPlanner: TaskPlanner;
   private contextManager: ContextManager;
+  private usageTracker: UsageTracker;
   private requiresApproval: boolean = true;
 
   constructor(configManager: ConfigManager) {
@@ -19,6 +21,7 @@ export class ConversationManager {
     this.openRouterClient = new OpenRouterClient(configManager);
     this.toolManager = new ToolManager(configManager.getConfig().allowedTools);
     this.taskPlanner = new TaskPlanner(configManager, this.toolManager);
+    this.usageTracker = new UsageTracker();
     
     // Initialize context manager with conservative limits for reduced hallucinations
     const contextLimits = configManager.getContextLimits();
@@ -32,6 +35,9 @@ export class ConversationManager {
       turnCount: 0,
       currentModel: configManager.getConfig().models.fallback
     };
+
+    // Start initial task tracking
+    this.usageTracker.startTask('conversation_start', 'Initial Conversation');
   }
 
   async processUserInput(input: string): Promise<string> {
@@ -59,6 +65,10 @@ export class ConversationManager {
       return this.getContextStatus();
     }
 
+    if (input.toLowerCase() === '/usage') {
+      return this.getUsageStatus();
+    }
+
     // Add user message
     this.conversation.messages.push({
       role: 'user',
@@ -79,13 +89,22 @@ export class ConversationManager {
       this.conversation.currentModel = this.configManager.getModelForTask(taskType);
 
       // Get AI response with managed context
-      let response = await this.openRouterClient.chat(
+      const chatResponse = await this.openRouterClient.chat(
         this.conversation.messages,
         taskType
       );
 
+      // Track usage
+      this.usageTracker.recordUsage({
+        prompt_tokens: chatResponse.usage.prompt_tokens,
+        completion_tokens: chatResponse.usage.completion_tokens,
+        total_tokens: chatResponse.usage.total_tokens,
+        model: chatResponse.model,
+        timestamp: new Date()
+      });
+
       // Process tool calls if present
-      response = await this.processToolCalls(response);
+      let response = await this.processToolCalls(chatResponse.content);
 
       // Add assistant response
       this.conversation.messages.push({
@@ -99,6 +118,12 @@ export class ConversationManager {
       const contextInfo = this.getContextWarning();
       if (contextInfo) {
         response += `\n\n${contextInfo}`;
+      }
+
+      // Add usage information to response
+      const usageDisplay = this.usageTracker.formatUsageDisplay();
+      if (usageDisplay) {
+        response += `\n${usageDisplay}`;
       }
 
       return response;
@@ -185,21 +210,34 @@ export class ConversationManager {
       // Mark task as in progress
       nextTask.status = 'in_progress';
       
+      // Start tracking this specific task
+      this.usageTracker.startTask(nextTask.id, nextTask.title);
+
       // Execute the task
       const taskPrompt = this.buildTaskExecutionPrompt(nextTask);
       const taskType = nextTask.type === 'analysis' || nextTask.type === 'planning' 
         ? 'reasoning' : 'coding';
       
-      const response = await this.openRouterClient.chat([
+      const chatResponse = await this.openRouterClient.chat([
         { role: 'system', content: this.getTaskExecutionSystemPrompt() },
         { role: 'user', content: taskPrompt }
       ], taskType);
 
+      // Track usage for this task
+      this.usageTracker.recordUsage({
+        prompt_tokens: chatResponse.usage.prompt_tokens,
+        completion_tokens: chatResponse.usage.completion_tokens,
+        total_tokens: chatResponse.usage.total_tokens,
+        model: chatResponse.model,
+        timestamp: new Date()
+      });
+
       // Process any tool calls
-      const processedResponse = await this.processToolCalls(response);
+      const processedResponse = await this.processToolCalls(chatResponse.content);
       
-      // Mark task as completed
+      // Mark task as completed and end task tracking
       this.taskPlanner.markTaskComplete(nextTask.id, processedResponse);
+      this.usageTracker.endCurrentTask();
       
       return `✅ **Completed: ${nextTask.title}**\n\n${processedResponse}`;
       
@@ -316,6 +354,10 @@ Available tools: ${this.toolManager.getAvailableTools().join(', ')}
       turnCount: 0,
       currentModel: config.models.fallback
     };
+    
+    // Reset usage tracking
+    this.usageTracker.reset();
+    this.usageTracker.startTask('conversation_start', 'Initial Conversation');
   }
 
   // Task Planning Methods
@@ -363,7 +405,18 @@ Available tools: ${this.toolManager.getAvailableTools().join(', ')}
       try {
         const { compressedMessages, summary } = await this.contextManager.compressConversation(
           this.conversation.messages,
-          (messages) => this.openRouterClient.chat(messages, 'reasoning')
+          async (messages) => {
+            const response = await this.openRouterClient.chat(messages, 'reasoning');
+            // Track usage for compression
+            this.usageTracker.recordUsage({
+              prompt_tokens: response.usage.prompt_tokens,
+              completion_tokens: response.usage.completion_tokens,
+              total_tokens: response.usage.total_tokens,
+              model: response.model,
+              timestamp: new Date()
+            });
+            return response.content;
+          }
         );
         this.conversation.messages = compressedMessages;
         console.log(`Compressed ${summary.messagesCompressed} messages, saved ${summary.tokensSaved} tokens`);
@@ -478,5 +531,65 @@ Available tools: ${this.toolManager.getAvailableTools().join(', ')}
   // Get current context window info
   getContextWindow(): ContextWindow {
     return this.contextManager.calculateContextWindow(this.conversation.messages);
+  }
+
+  // Usage tracking methods
+  getUsageTracker(): UsageTracker {
+    return this.usageTracker;
+  }
+
+  getConversationUsage() {
+    return this.usageTracker.getConversationUsage();
+  }
+
+  getCurrentTaskUsage() {
+    return this.usageTracker.getCurrentTaskUsage();
+  }
+
+  private getUsageStatus(): string {
+    const conversation = this.usageTracker.getConversationUsage();
+    const currentTask = this.usageTracker.getCurrentTaskUsage();
+
+    let status = '📊 **Detailed Usage Report**\n\n';
+
+    // Current task details
+    if (currentTask) {
+      status += `**Current Task: ${currentTask.taskName}**\n`;
+      status += `• Task ID: ${currentTask.taskId}\n`;
+      status += `• Requests: ${currentTask.requestCount}\n`;
+      status += `• Prompt tokens: ${currentTask.totalPromptTokens.toLocaleString()}\n`;
+      status += `• Completion tokens: ${currentTask.totalCompletionTokens.toLocaleString()}\n`;
+      status += `• Total tokens: ${currentTask.totalTokens.toLocaleString()}\n`;
+      status += `• Models used: ${currentTask.models.join(', ')}\n`;
+      status += `• Started: ${currentTask.startTime.toLocaleString()}\n\n`;
+    }
+
+    // Conversation totals
+    status += `**Conversation Totals:**\n`;
+    status += `• Total requests: ${conversation.totalRequests}\n`;
+    status += `• Total prompt tokens: ${conversation.totalPromptTokens.toLocaleString()}\n`;
+    status += `• Total completion tokens: ${conversation.totalCompletionTokens.toLocaleString()}\n`;
+    status += `• Total tokens: ${conversation.totalTokens.toLocaleString()}\n`;
+    status += `• Models used: ${conversation.modelsUsed.join(', ')}\n`;
+    status += `• Conversation started: ${conversation.startTime.toLocaleString()}\n`;
+    status += `• Tasks completed: ${conversation.tasks.filter(t => t.endTime).length}\n`;
+    status += `• Tasks in progress: ${conversation.tasks.filter(t => !t.endTime).length}\n\n`;
+
+    // Task breakdown
+    if (conversation.tasks.length > 0) {
+      status += `**Task Breakdown:**\n`;
+      conversation.tasks.forEach((task, index) => {
+        const statusIcon = task.endTime ? '✅' : '🔄';
+        status += `${index + 1}. ${statusIcon} ${task.taskName}\n`;
+        status += `   • Tokens: ${task.totalTokens.toLocaleString()}\n`;
+        status += `   • Requests: ${task.requestCount}\n`;
+        if (task.endTime) {
+          const duration = task.endTime.getTime() - task.startTime.getTime();
+          status += `   • Duration: ${Math.round(duration / 1000)}s\n`;
+        }
+      });
+    }
+
+    return status;
   }
 }

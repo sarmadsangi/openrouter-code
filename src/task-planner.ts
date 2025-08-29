@@ -46,7 +46,7 @@ export class TaskPlanner {
         { role: 'user', content: planningPrompt }
       ], 'reasoning');
 
-      const plan = this.parseTaskPlanFromResponse(response, userRequest);
+      const plan = this.parseTaskPlanFromResponse(response.content, userRequest);
       this.currentPlan = plan;
       return plan;
     } catch (error: any) {
