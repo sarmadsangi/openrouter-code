@@ -3,14 +3,17 @@
   "version": "1.0.0",
   "description": "A Claude Code clone using OpenRouter for configurable AI models",
   "main": "dist/index.js",
+  "type": "commonjs",
   "bin": {
-    "orcode": "dist/cli.js"
+    "orcode": "dist/cli.js",
+    "workspace": "dist/cli/workspace-cli.js"
   },
   "scripts": {
     "build": "tsc",
     "dev": "ts-node src/cli.ts",
     "start": "node dist/cli.js",
-    "watch": "tsc --watch"
+    "watch": "tsc --watch",
+    "workspace": "node dist/cli/workspace-cli.js"
   },
   "keywords": ["ai", "coding", "assistant", "openrouter", "claude"],
   "author": "",
