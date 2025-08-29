@@ -5,6 +5,7 @@ import { ToolManager } from './tools/tool-manager';
 import { TaskPlanner, TaskPlan, Task } from './task-planner';
 import { ContextManager, ContextWindow } from './context-manager';
 import { UsageTracker } from './usage-tracker';
+import { workspaceManager } from './config/workspace-config';
 
 export class ConversationManager {
   private conversation: Conversation;
@@ -25,8 +26,14 @@ export class ConversationManager {
     
     // Initialize context manager with conservative limits for reduced hallucinations
     const contextLimits = configManager.getContextLimits();
-    this.contextManager = new ContextManager(contextLimits.maxTokens, contextLimits.targetTokens);
+    const currentWorkspace = workspaceManager.getCurrentWorkspace();
+    this.contextManager = new ContextManager(
+      contextLimits.maxTokens, 
+      contextLimits.targetTokens, 
+      currentWorkspace.path
+    );
     
+    // Initialize conversation with system prompt - blueprint will be added later
     this.conversation = {
       messages: [{
         role: 'system',
@@ -36,8 +43,47 @@ export class ConversationManager {
       currentModel: configManager.getConfig().models.fallback
     };
 
+    // Initialize with blueprint context
+    this.initializeWithBlueprint();
+
     // Start initial task tracking
     this.usageTracker.startTask('conversation_start', 'Initial Conversation');
+  }
+
+  /**
+   * Initialize the conversation with blueprint context if available
+   */
+  private async initializeWithBlueprint(): Promise<void> {
+    try {
+      const blueprintContext = await this.contextManager.getBlueprintContext();
+      if (blueprintContext) {
+        // Append blueprint context to the system message
+        const systemMessage = this.conversation.messages[0];
+        systemMessage.content += blueprintContext;
+      }
+    } catch (error) {
+      console.warn('Failed to initialize blueprint context:', error);
+    }
+  }
+
+  /**
+   * Refresh blueprint context if the workspace has changed
+   */
+  async refreshBlueprintContext(): Promise<void> {
+    const currentWorkspace = workspaceManager.getCurrentWorkspace();
+    this.contextManager.setWorkingDirectory(currentWorkspace.path);
+    
+    try {
+      const blueprintContext = await this.contextManager.getBlueprintContext();
+      if (blueprintContext) {
+        // Update the system message with fresh blueprint context
+        const systemMessage = this.conversation.messages[0];
+        const basePrompt = this.configManager.getConfig().systemPrompt;
+        systemMessage.content = basePrompt + blueprintContext;
+      }
+    } catch (error) {
+      console.warn('Failed to refresh blueprint context:', error);
+    }
   }
 
   async processUserInput(input: string): Promise<string> {
@@ -67,6 +113,19 @@ export class ConversationManager {
 
     if (input.toLowerCase() === '/usage') {
       return this.getUsageStatus();
+    }
+
+    if (input.toLowerCase() === '/blueprint') {
+      return this.getBlueprintStatus();
+    }
+
+    if (input.toLowerCase() === '/refresh-blueprint') {
+      await this.refreshBlueprintContext();
+      return 'Blueprint context refreshed from current workspace.';
+    }
+
+    if (input.toLowerCase() === '/workspace') {
+      return this.getWorkspaceStatus();
     }
 
     // Add user message
@@ -135,21 +194,83 @@ export class ConversationManager {
   }
 
   private shouldCreateTaskPlan(input: string): boolean {
-    const complexTaskIndicators = [
-      'implement', 'create', 'build', 'develop', 'refactor', 'migrate',
-      'setup', 'configure', 'add feature', 'new feature', 'complete',
-      'full', 'entire', 'whole project', 'from scratch', 'step by step'
-    ];
-    
     const inputLower = input.toLowerCase();
-    const hasComplexIndicator = complexTaskIndicators.some(indicator => 
+    
+    // Simple execution tasks - don't need planning
+    const simpleTaskIndicators = [
+      'show', 'list', 'display', 'print', 'view', 'check', 'status',
+      'what is', 'what are', 'how does', 'explain', 'tell me', 'help',
+      'fix this error', 'debug this', 'why is', 'where is',
+      'find', 'search', 'grep', 'look for', 'locate'
+    ];
+
+    // Quick modifications - don't need planning
+    const quickModificationIndicators = [
+      'change this', 'update this', 'modify this', 'edit this',
+      'replace this', 'fix this bug', 'correct this', 'adjust this',
+      'add this line', 'remove this line', 'delete this',
+      'rename this', 'move this file'
+    ];
+
+    // Complex project tasks - need planning
+    const complexTaskIndicators = [
+      'implement', 'create new', 'build', 'develop', 'refactor entire',
+      'migrate', 'setup project', 'configure project', 'add feature',
+      'new feature', 'complete project', 'full implementation',
+      'entire application', 'whole project', 'from scratch',
+      'step by step', 'architecture', 'design system',
+      'multiple files', 'several components', 'database schema'
+    ];
+
+    // Multi-step indicators - need planning
+    const multiStepIndicators = [
+      'first', 'then', 'after that', 'next', 'finally',
+      'phase 1', 'phase 2', 'step 1', 'step 2',
+      'multiple steps', 'several tasks', 'different parts'
+    ];
+
+    // Check for simple tasks first
+    const hasSimpleIndicator = simpleTaskIndicators.some(indicator => 
       inputLower.includes(indicator)
     );
     
-    const isLongRequest = input.split(' ').length > 10;
-    const hasMultipleRequirements = input.includes(' and ') || input.includes(',');
+    const hasQuickModIndicator = quickModificationIndicators.some(indicator => 
+      inputLower.includes(indicator)
+    );
+
+    // If it's a simple task, don't plan
+    if (hasSimpleIndicator || (hasQuickModIndicator && input.split(' ').length < 15)) {
+      return false;
+    }
+
+    // Check for complex indicators
+    const hasComplexIndicator = complexTaskIndicators.some(indicator => 
+      inputLower.includes(indicator)
+    );
+
+    const hasMultiStepIndicator = multiStepIndicators.some(indicator => 
+      inputLower.includes(indicator)
+    );
+
+    // Strong indicators for planning
+    if (hasComplexIndicator || hasMultiStepIndicator) {
+      return true;
+    }
+
+    // Length and complexity heuristics
+    const wordCount = input.split(' ').length;
+    const hasMultipleRequirements = input.includes(' and ') || 
+                                   input.split(',').length > 2 ||
+                                   input.split('.').length > 2;
     
-    return hasComplexIndicator || (isLongRequest && hasMultipleRequirements);
+    const hasFileOperations = inputLower.includes('file') || 
+                              inputLower.includes('component') ||
+                              inputLower.includes('module');
+
+    // Plan if it's a long request with multiple requirements or file operations
+    return (wordCount > 15 && hasMultipleRequirements) || 
+           (wordCount > 20 && hasFileOperations) ||
+           (wordCount > 30);
   }
 
   private async handleComplexTask(input: string): Promise<string> {
@@ -590,6 +711,44 @@ Available tools: ${this.toolManager.getAvailableTools().join(', ')}
       });
     }
 
+    return status;
+  }
+
+  private getBlueprintStatus(): string {
+    const currentWorkspace = workspaceManager.getCurrentWorkspace();
+    const blueprintExists = this.contextManager.blueprintExists();
+    
+    let status = `**Blueprint Status:**\n\n`;
+    status += `• Current workspace: ${currentWorkspace.name} (${currentWorkspace.path})\n`;
+    status += `• Blueprint.md exists: ${blueprintExists ? '✅ Yes' : '❌ No'}\n`;
+    
+    if (blueprintExists) {
+      status += `• Status: Loaded in system context\n`;
+      status += `• Use /refresh-blueprint to reload if changed\n`;
+    } else {
+      status += `• Create a blueprint.md file in your project root for automatic context loading\n`;
+    }
+    
+    return status;
+  }
+
+  private getWorkspaceStatus(): string {
+    const currentWorkspace = workspaceManager.getCurrentWorkspace();
+    const allWorkspaces = workspaceManager.listWorkspaces();
+    
+    let status = `**Workspace Status:**\n\n`;
+    status += `• Current workspace: ${currentWorkspace.name}\n`;
+    status += `• Current path: ${currentWorkspace.path}\n`;
+    status += `• Blueprint.md exists: ${this.contextManager.blueprintExists() ? '✅' : '❌'}\n\n`;
+    
+    status += `**Available Workspaces:**\n`;
+    Object.entries(allWorkspaces).forEach(([name, path]) => {
+      const isCurrent = name === currentWorkspace.name;
+      const marker = isCurrent ? '👉' : '  ';
+      status += `${marker} ${name}: ${path}\n`;
+    });
+    
+    status += `\nUse the workspace CLI to manage workspaces: workspace switch <name>\n`;
     return status;
   }
 }
