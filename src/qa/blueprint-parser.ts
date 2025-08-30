@@ -56,9 +56,17 @@ export class BlueprintParser {
   }
 
   private extractServerCommand(content: string): string {
-    // Look for various patterns that might indicate server commands
+    // Look for markdown bold patterns with backticks
+    const boldCommandMatch = content.match(/\*\*Start Command:\*\*\s*`([^`]+)`/i);
+    if (boldCommandMatch) {
+      return boldCommandMatch[1].trim();
+    }
+
+    // Look for other command patterns
     const patterns = [
-      /(?:server|start|run|dev|serve)\s*(?:command|cmd)?[:\s]*[`'"]*([^`'"\\n]+)[`'"]*$/im,
+      /Start Command[:\s]*`([^`]+)`/im,
+      /(?:server\s+command|command)[:\s]*`([^`]+)`/im,
+      /(?:start\s+command|server\s+command|command)[:\s]*([^\\n]+)/im,
       /npm\s+(?:run\s+)?(?:start|dev|serve)[^\\n]*/im,
       /yarn\s+(?:start|dev|serve)[^\\n]*/im,
       /node\s+[^\\n]+/im,
@@ -69,7 +77,7 @@ export class BlueprintParser {
     for (const pattern of patterns) {
       const match = content.match(pattern);
       if (match) {
-        return match[1] || match[0].trim();
+        return (match[1] || match[0]).trim();
       }
     }
 
@@ -107,9 +115,15 @@ export class BlueprintParser {
   }
 
   private extractBaseUrl(content: string): string | undefined {
-    const urlMatch = content.match(/(?:base[_\\s]*url|url)[:\s]*([^\\s\\n]+)/i);
+    // Look for markdown bold URL patterns
+    const boldUrlMatch = content.match(/\*\*Base URL:\*\*\s*([^\\s\\n]+)/i);
+    if (boldUrlMatch) {
+      return boldUrlMatch[1].trim();
+    }
+
+    const urlMatch = content.match(/(?:base\s+url|url)[:\s]*([^\\s\\n]+)/i);
     if (urlMatch) {
-      return urlMatch[1];
+      return urlMatch[1].trim();
     }
     return undefined;
   }

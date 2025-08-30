@@ -123,35 +123,45 @@ export class ServerManager {
     const timeout = this.config.startupTimeout || 30000;
     const startTime = Date.now();
     
+    // Give the server a moment to start before first check
+    await new Promise(resolve => setTimeout(resolve, 2000));
+    
     while (Date.now() - startTime < timeout) {
       if (await this.checkServerHealth()) {
         console.log('Server is ready!');
         return true;
       }
       
-      // Wait 1 second before checking again
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      console.log('Waiting for server to be ready...');
+      // Wait 2 seconds before checking again
+      await new Promise(resolve => setTimeout(resolve, 2000));
     }
     
+    console.log('Server health check timed out');
     return false;
   }
 
   private async checkServerHealth(): Promise<boolean> {
     const port = this.config.port || 3000;
     const healthPath = this.config.healthCheckPath || '/';
-    const baseUrl = this.config.baseUrl || `http://localhost:${port}`;
-    const url = `${baseUrl}${healthPath}`;
+    const url = `http://localhost:${port}${healthPath}`;
     
     return new Promise((resolve) => {
+      console.log(`Checking server health at: ${url}`);
+      
       const request = http.get(url, (response) => {
-        resolve(response.statusCode !== undefined && response.statusCode < 500);
+        const success = response.statusCode !== undefined && response.statusCode < 500;
+        console.log(`Health check response: ${response.statusCode} - ${success ? 'OK' : 'FAILED'}`);
+        resolve(success);
       });
       
-      request.on('error', () => {
+      request.on('error', (error) => {
+        console.log(`Health check error: ${error.message}`);
         resolve(false);
       });
       
       request.setTimeout(5000, () => {
+        console.log('Health check timeout');
         request.destroy();
         resolve(false);
       });
