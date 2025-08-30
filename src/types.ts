@@ -13,7 +13,7 @@ export interface AssistantConfig {
   models: ModelConfig;
 }
 
-export type Tool = "Read" | "Write" | "Bash" | "Grep" | "Search" | "WebSearch";
+export type Tool = "Read" | "Write" | "Bash" | "Grep" | "Search" | "WebSearch" | "QA";
 
 export interface Message {
   role: "system" | "user" | "assistant";

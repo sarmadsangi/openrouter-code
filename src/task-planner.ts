@@ -219,7 +219,7 @@ Always structure your response with clear task breakdowns that can be executed s
   }
 
   private createBasicPlan(userRequest: string): Task[] {
-    return [
+    const tasks: Task[] = [
       {
         id: this.generateId(),
         title: 'Analyze Requirements',
@@ -251,6 +251,35 @@ Always structure your response with clear task breakdowns that can be executed s
         toolsRequired: ['Read', 'Write', 'Bash']
       }
     ];
+
+    // Add QA validation task if this involves web development
+    if (this.shouldAddQAValidation(userRequest)) {
+      tasks.push({
+        id: this.generateId(),
+        title: 'QA Validation',
+        description: 'Validate implementation using automated browser testing',
+        type: 'testing',
+        dependencies: [],
+        status: 'pending',
+        estimatedComplexity: 'medium',
+        toolsRequired: ['QA']
+      });
+    }
+
+    return tasks;
+  }
+
+  private shouldAddQAValidation(userRequest: string): boolean {
+    const lower = userRequest.toLowerCase();
+    
+    // Add QA validation for web-related tasks
+    const webKeywords = [
+      'web', 'website', 'app', 'frontend', 'backend', 'server', 'ui', 'interface',
+      'react', 'vue', 'angular', 'html', 'css', 'javascript', 'typescript',
+      'component', 'page', 'route', 'form', 'button', 'navigation', 'api'
+    ];
+    
+    return webKeywords.some(keyword => lower.includes(keyword));
   }
 
   private setTaskDependencies(tasks: Task[]): void {

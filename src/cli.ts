@@ -7,6 +7,7 @@ import ora from 'ora';
 import { ConfigManager } from './config';
 import { ConversationManager } from './conversation-manager';
 import { OpenRouterClient } from './openrouter-client';
+import { QAAgent } from './qa/qa-agent';
 
 const program = new Command();
 
@@ -49,6 +50,16 @@ program
   .description('Configure reasoning and coding models')
   .action(async () => {
     await configureModels();
+  });
+
+program
+  .command('qa')
+  .description('Run QA validation on web application')
+  .option('-p, --prompt <prompt>', 'Custom test prompt')
+  .option('-b, --blueprint <path>', 'Path to blueprint.md file')
+  .option('-w, --workspace <path>', 'Workspace path (defaults to current directory)')
+  .action(async (options) => {
+    await runQAValidation(options);
   });
 
 async function startChatSession(options: any) {
@@ -414,6 +425,82 @@ async function configureModels() {
     
   } catch (error: any) {
     console.error(chalk.red('Failed to configure models:'), error.message);
+  }
+}
+
+async function runQAValidation(options: any) {
+  try {
+    const configManager = new ConfigManager();
+    const workspacePath = options.workspace || process.cwd();
+    
+    console.log(chalk.blue('🧪 Starting QA Validation...'));
+    console.log(chalk.gray(`Workspace: ${workspacePath}`));
+    
+    if (options.blueprint) {
+      console.log(chalk.gray(`Blueprint: ${options.blueprint}`));
+    }
+    
+    const spinner = ora('Initializing QA Agent...').start();
+    
+    const qaAgent = new QAAgent(workspacePath, configManager);
+    await qaAgent.initialize(options.blueprint);
+    
+    spinner.text = 'Running QA tests...';
+    
+    let result;
+    if (options.prompt) {
+      console.log(chalk.gray(`Custom prompt: ${options.prompt}`));
+      result = await qaAgent.validateWithCustomPrompt(options.prompt);
+    } else {
+      result = await qaAgent.validateAutomatically();
+    }
+    
+    spinner.stop();
+    
+    // Display results
+    console.log();
+    console.log(chalk.bold('🧪 QA Validation Results'));
+    console.log('='.repeat(50));
+    
+    if (result.success) {
+      console.log(chalk.green(`✅ All tests passed! (${result.testsPassed}/${result.testsRun})`));
+    } else {
+      console.log(chalk.red(`❌ Some tests failed (${result.testsPassed}/${result.testsRun})`));
+    }
+    
+    console.log();
+    console.log(chalk.bold('Test Results:'));
+    result.testResults.forEach((testResult, index) => {
+      const status = testResult.success ? chalk.green('✅') : chalk.red('❌');
+      const duration = chalk.gray(`(${testResult.duration}ms)`);
+      console.log(`${index + 1}. ${status} ${testResult.testCase.name} ${duration}`);
+      
+      if (!testResult.success && testResult.error) {
+        console.log(chalk.red(`   Error: ${testResult.error}`));
+      }
+    });
+    
+    if (result.recommendations && result.recommendations.length > 0) {
+      console.log();
+      console.log(chalk.yellow('💡 Recommendations:'));
+      result.recommendations.forEach(rec => {
+        console.log(chalk.yellow(`- ${rec}`));
+      });
+    }
+    
+    console.log();
+    console.log(chalk.gray('Summary:'));
+    console.log(result.summary);
+    
+    await qaAgent.cleanup();
+    
+    if (!result.success) {
+      process.exit(1);
+    }
+    
+  } catch (error: any) {
+    console.error(chalk.red('QA validation failed:'), error.message);
+    process.exit(1);
   }
 }
 

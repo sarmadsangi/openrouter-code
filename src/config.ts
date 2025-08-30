@@ -41,7 +41,7 @@ Always:
 - Follow best practices and coding standards
 - Be helpful but cautious with file modifications
 
-Available tools: Read, Write, Bash, Grep, Search, WebSearch`;
+Available tools: Read, Write, Bash, Grep, Search, WebSearch, QA`;
   }
 
   private getAllowedTools(): Tool[] {
@@ -49,7 +49,7 @@ Available tools: Read, Write, Bash, Grep, Search, WebSearch`;
     if (toolsEnv) {
       return toolsEnv.split(',').map(t => t.trim() as Tool);
     }
-    return ["Read", "Write", "Bash", "Grep", "Search", "WebSearch"];
+    return ["Read", "Write", "Bash", "Grep", "Search", "WebSearch", "QA"];
   }
 
   getConfig(): AssistantConfig {

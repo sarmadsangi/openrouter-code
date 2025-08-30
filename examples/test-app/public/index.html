@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QA Test App</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        header { background: #007bff; color: white; padding: 1rem 0; margin-bottom: 2rem; }
+        nav ul { list-style: none; display: flex; gap: 20px; }
+        nav a { color: white; text-decoration: none; padding: 10px 15px; border-radius: 4px; }
+        nav a:hover { background: rgba(255,255,255,0.2); }
+        .hero { text-align: center; margin: 40px 0; }
+        .hero h1 { font-size: 2.5rem; margin-bottom: 1rem; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin: 40px 0; }
+        .feature { background: #f8f9fa; padding: 20px; border-radius: 8px; }
+        .contact-form { background: white; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); max-width: 600px; margin: 40px auto; }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-group input, .form-group textarea { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .btn { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        .btn:hover { background: #0056b3; }
+        .btn:disabled { background: #6c757d; cursor: not-allowed; }
+        .message { padding: 15px; border-radius: 4px; margin: 20px 0; }
+        .message.success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .message.error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .hidden { display: none; }
+        footer { background: #f8f9fa; padding: 20px 0; margin-top: 40px; text-align: center; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="container">
+            <nav>
+                <ul>
+                    <li><a href="/" id="nav-home">Home</a></li>
+                    <li><a href="/about" id="nav-about">About</a></li>
+                    <li><a href="#contact" id="nav-contact">Contact</a></li>
+                </ul>
+            </nav>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="hero">
+            <h1>Welcome to QA Test App</h1>
+            <p>This is a sample application designed to test QA automation capabilities.</p>
+            <button class="btn" id="get-started-btn">Get Started</button>
+        </section>
+
+        <section class="features">
+            <div class="feature">
+                <h3>🧪 Automated Testing</h3>
+                <p>Comprehensive browser automation testing with Playwright integration.</p>
+            </div>
+            <div class="feature">
+                <h3>🤖 AI-Powered QA</h3>
+                <p>Intelligent test case generation and validation using AI.</p>
+            </div>
+            <div class="feature">
+                <h3>📊 Detailed Reports</h3>
+                <p>Comprehensive test reports with screenshots and recommendations.</p>
+            </div>
+        </section>
+
+        <section id="contact" class="contact-form">
+            <h2>Contact Us</h2>
+            <form id="contact-form">
+                <div class="form-group">
+                    <label for="name">Name *</label>
+                    <input type="text" id="name" name="name" required>
+                </div>
+                <div class="form-group">
+                    <label for="email">Email *</label>
+                    <input type="email" id="email" name="email" required>
+                </div>
+                <div class="form-group">
+                    <label for="message">Message *</label>
+                    <textarea id="message" name="message" rows="5" required></textarea>
+                </div>
+                <button type="submit" class="btn" id="submit-btn">Send Message</button>
+            </form>
+            <div id="form-message" class="message hidden"></div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2024 QA Test App. Built for testing automation.</p>
+        </div>
+    </footer>
+
+    <script>
+        // Get Started button functionality
+        document.getElementById('get-started-btn').addEventListener('click', function() {
+            document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+        });
+
+        // Contact form functionality
+        document.getElementById('contact-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submit-btn');
+            const messageDiv = document.getElementById('form-message');
+            
+            // Get form data
+            const formData = {
+                name: document.getElementById('name').value,
+                email: document.getElementById('email').value,
+                message: document.getElementById('message').value
+            };
+            
+            // Disable button and show loading
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Sending...';
+            messageDiv.className = 'message hidden';
+            
+            try {
+                const response = await fetch('/api/contact', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok) {
+                    messageDiv.className = 'message success';
+                    messageDiv.textContent = result.message;
+                    document.getElementById('contact-form').reset();
+                } else {
+                    messageDiv.className = 'message error';
+                    messageDiv.textContent = result.error || 'Something went wrong';
+                }
+            } catch (error) {
+                messageDiv.className = 'message error';
+                messageDiv.textContent = 'Network error. Please try again.';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Send Message';
+            }
+        });
+
+        // Navigation smooth scrolling
+        document.getElementById('nav-contact').addEventListener('click', function(e) {
+            e.preventDefault();
+            document.getElementById('contact').scrollIntoView({ behavior: 'smooth' });
+        });
+    </script>
+</body>
+</html>
