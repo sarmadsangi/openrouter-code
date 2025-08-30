@@ -7,7 +7,8 @@ A Claude Code clone that uses OpenRouter for flexible AI model selection, allowi
 - 🧠 **Smart Task Planning**: Automatically breaks down complex requests into manageable tasks
 - 📖 **Blueprint Auto-loading**: Automatically loads `blueprint.md` for project context
 - 🤖 **Multiple Model Support**: Configure separate models for reasoning vs coding tasks
-- 🛠️ **Comprehensive Tools**: Read, Write, Bash, Grep, Search, WebSearch capabilities
+- 🛠️ **Comprehensive Tools**: Read, Write, Bash, Grep, Search, WebSearch, QA capabilities
+- 🧪 **QA Agent**: Automated web application testing with browser automation
 - 🗂️ **Workspace Management**: Support for multiple project environments
 - ⚡ **Optimized DevX**: Minimal API surface with maximum functionality
 - 🔧 **Configurable**: Flexible configuration via environment variables
@@ -195,6 +196,63 @@ workspace switch myproject
 
 # List all workspaces
 workspace list
+```
+
+## QA Agent - Automated Testing
+
+The QA Agent provides automated web application testing using browser automation. It integrates seamlessly with the task planning system and can validate implementations automatically.
+
+### Quick QA Testing
+
+```bash
+# Run automatic QA validation
+orcode qa
+
+# Test with custom prompt
+orcode qa --prompt "test the user login flow"
+
+# Demo mode (no API key required)
+orcode qa --demo
+
+# Use custom blueprint
+orcode qa --blueprint ./my-app/blueprint.md
+```
+
+### Agentic QA Integration
+
+When you request web development tasks, QA validation automatically runs:
+
+```bash
+orcode chat
+> "Create a contact form for my website"
+```
+
+The system will:
+1. Implement the contact form
+2. **Automatically run QA tests** to validate functionality
+3. Fix any issues found and re-test
+4. Complete only when all tests pass
+
+### Blueprint QA Configuration
+
+Add QA settings to your `blueprint.md`:
+
+```markdown
+## Server Configuration
+**Start Command:** `npm run dev`
+**Port:** 3000
+**Health Check:** /api/health
+
+## QA Testing Configuration
+
+### Test Cases
+- Verify home page loads correctly
+- Test form submissions and validation
+- Check navigation functionality
+
+### Browser Configuration
+**Browsers:** chromium, firefox
+**Viewport:** 1280x720
 ```
 
 ### Example Usage

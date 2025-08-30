@@ -73,7 +73,7 @@ describe('BrowserManager', () => {
     it('should support multiple browsers', async () => {
       const multiConfig = {
         ...mockConfig,
-        browsers: ['chromium', 'firefox'] as const
+        browsers: ['chromium', 'firefox'] as ('chromium' | 'firefox' | 'webkit')[]
       };
       
       const multiBrowserManager = new BrowserManager(multiConfig);

@@ -172,7 +172,14 @@ describe('QA Agent Integration Tests', () => {
 
       qaAgent['browserManager'] = mockBrowserManager as any;
       qaAgent['serverManager'] = mockServerManager as any;
-      qaAgent['config'] = mockConfig;
+      qaAgent['config'] = {
+        server: {
+          command: 'echo "Mock server started"',
+          port: 3000,
+          healthCheckPath: '/',
+          startupTimeout: 30000
+        }
+      };
 
       await expect(qaAgent.runQA()).rejects.toThrow('Server failed');
       expect(mockBrowserManager.cleanup).toHaveBeenCalled();
