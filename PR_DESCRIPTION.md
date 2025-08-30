@@ -11,10 +11,10 @@ This PR introduces a comprehensive QA Agent system that automatically validates 
 - **Iterative Testing**: If tests fail, the system fixes issues and re-runs validation until all tests pass
 - **Smart Detection**: Automatically detects web development tasks and adds QA validation steps
 
-### 2. Intelligent Test Generation
-- **AI-Powered**: Uses OpenRouter models to generate comprehensive test cases based on custom prompts
+### 2. AI-Powered Test Generation
+- **Intelligent Analysis**: Uses OpenRouter models to generate comprehensive test cases based on custom prompts
 - **Page Analysis**: Automatically analyzes running applications to discover testable elements
-- **Fallback Testing**: Robust fallback test generation when AI is unavailable (demo mode)
+- **Context-Aware**: Combines page structure analysis with AI to create relevant test scenarios
 
 ### 3. Browser Automation
 - **Playwright Integration**: Cross-browser testing support (Chromium, Firefox, WebKit)
@@ -69,8 +69,8 @@ orcode qa
 # Custom test prompt
 orcode qa --prompt "test the user registration flow"
 
-# Demo mode (no API key required)
-orcode qa --demo
+# Run QA validation
+orcode qa
 
 # Custom blueprint
 orcode qa --blueprint ./my-project/blueprint.md
@@ -105,11 +105,11 @@ When OpenRouter API is available, the QA agent generates intelligent test cases 
 - Examining the running application's DOM structure
 - Creating targeted test scenarios for specific functionality
 
-### Fallback Generation
-In demo mode or when AI is unavailable:
-- Analyzes page structure to identify forms, buttons, and links
-- Generates standard test patterns (navigation, form submission, element checking)
-- Provides comprehensive coverage of common web app functionality
+### Page Structure Analysis
+When generating automatic test cases:
+- Analyzes the running application's DOM structure
+- Identifies forms, buttons, links, and interactive elements
+- Provides rich context to AI for generating targeted test scenarios
 
 ## 📊 Test Execution & Reporting
 
@@ -151,7 +151,7 @@ In demo mode or when AI is unavailable:
 - **Comprehensive Coverage**: AI generates test cases humans might miss
 - **Cross-Browser Validation**: Ensures compatibility across different browsers
 
-## 🚀 Demo
+## 🚀 Example
 
 The PR includes a complete working example:
 

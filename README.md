@@ -211,8 +211,8 @@ orcode qa
 # Test with custom prompt
 orcode qa --prompt "test the user login flow"
 
-# Demo mode (no API key required)
-orcode qa --demo
+# Run QA validation
+orcode qa
 
 # Use custom blueprint
 orcode qa --blueprint ./my-app/blueprint.md

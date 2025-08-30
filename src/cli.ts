@@ -58,7 +58,6 @@ program
   .option('-p, --prompt <prompt>', 'Custom test prompt')
   .option('-b, --blueprint <path>', 'Path to blueprint.md file')
   .option('-w, --workspace <path>', 'Workspace path (defaults to current directory)')
-  .option('-d, --demo', 'Run in demo mode (no API key required)')
   .action(async (options) => {
     await runQAValidation(options);
   });
@@ -443,7 +442,7 @@ async function runQAValidation(options: any) {
     
     const spinner = ora('Initializing QA Agent...').start();
     
-    const qaAgent = new QAAgent(workspacePath, configManager, options.demo);
+    const qaAgent = new QAAgent(workspacePath, configManager);
     await qaAgent.initialize(options.blueprint);
     
     spinner.text = 'Running QA tests...';

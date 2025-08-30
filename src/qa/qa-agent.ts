@@ -53,19 +53,13 @@ export class QAAgent {
   private browserManager: BrowserManager | null = null;
   private serverManager: ServerManager | null = null;
   private config: QAConfig | null = null;
-  private openRouterClient?: OpenRouterClient;
+  private openRouterClient: OpenRouterClient;
   private workspacePath: string;
-  private demoMode: boolean = false;
 
-  constructor(workspacePath: string, configManager: ConfigManager, demoMode: boolean = false) {
+  constructor(workspacePath: string, configManager: ConfigManager) {
     this.workspacePath = workspacePath;
     this.blueprintParser = new BlueprintParser(workspacePath);
-    this.demoMode = demoMode;
-    
-    // Only initialize OpenRouter client if not in demo mode
-    if (!demoMode) {
-      this.openRouterClient = new OpenRouterClient(configManager);
-    }
+    this.openRouterClient = new OpenRouterClient(configManager);
   }
 
   async initialize(blueprintPath?: string): Promise<void> {
@@ -94,10 +88,10 @@ export class QAAgent {
     }
 
     try {
-      // Generate or use provided test cases
+      // Generate test cases using AI only
       const testCases = customPrompt 
-        ? (this.demoMode ? this.getPromptBasedFallbackTestCases(customPrompt) : await this.generateTestCasesFromPrompt(customPrompt))
-        : (this.demoMode ? this.getFallbackTestCases() : await this.generateAutomaticTestCases());
+        ? await this.generateTestCasesFromPrompt(customPrompt)
+        : await this.generateAutomaticTestCases();
 
       // Run all test cases
       const testResults: TestCaseResult[] = [];
@@ -142,10 +136,6 @@ Return a JSON array of test cases with this structure:
 
 Focus on practical, executable test cases that validate real functionality.`;
 
-      if (!this.openRouterClient) {
-        throw new Error('OpenRouter client not available in demo mode');
-      }
-      
       const response = await this.openRouterClient.chat([
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Generate test cases for: ${prompt}` }
@@ -154,56 +144,11 @@ Focus on practical, executable test cases that validate real functionality.`;
       const testCases = JSON.parse(response.content);
       return Array.isArray(testCases) ? testCases : [testCases];
     } catch (error) {
-      console.warn('Failed to generate AI test cases, using prompt-based fallback');
-      return this.getPromptBasedFallbackTestCases(prompt);
+      throw new Error(`Failed to generate test cases from prompt: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
-  private getPromptBasedFallbackTestCases(prompt: string): TestCase[] {
-    const lower = prompt.toLowerCase();
-    
-    // Generate test cases based on keywords in the prompt
-    if (lower.includes('form') || lower.includes('contact') || lower.includes('submit')) {
-      return [
-        {
-          id: 'form_validation',
-          name: 'Form Validation Test',
-          description: 'Test form functionality and validation',
-          steps: [
-            { action: 'navigate', target: '/', description: 'Navigate to home page' },
-            { action: 'click', target: 'form button, [type="submit"]', description: 'Find and click submit button' },
-            { action: 'fill', target: 'input[type="email"], input[name*="email"]', value: 'test@example.com', description: 'Fill email field' },
-            { action: 'fill', target: 'input[type="text"], input[name*="name"]', value: 'Test User', description: 'Fill name field' },
-            { action: 'fill', target: 'textarea', value: 'Test message', description: 'Fill message field' },
-            { action: 'click', target: '[type="submit"], button[type="submit"]', description: 'Submit form' },
-            { action: 'wait', timeout: 2000, description: 'Wait for form submission' }
-          ],
-          expectedResults: ['Form submits successfully', 'Success message appears'],
-          priority: 'high'
-        }
-      ];
-    }
-    
-    if (lower.includes('navigation') || lower.includes('nav') || lower.includes('menu')) {
-      return [
-        {
-          id: 'navigation_test',
-          name: 'Navigation Test',
-          description: 'Test website navigation functionality',
-          steps: [
-            { action: 'navigate', target: '/', description: 'Navigate to home page' },
-            { action: 'click', target: 'nav a, .nav a, header a', description: 'Click navigation links' },
-            { action: 'check', target: 'h1, h2, main', description: 'Verify page content loaded' }
-          ],
-          expectedResults: ['All navigation links work', 'Pages load correctly'],
-          priority: 'high'
-        }
-      ];
-    }
-    
-    // Default comprehensive test
-    return this.getFallbackTestCases();
-  }
+
 
   private async generateAutomaticTestCases(): Promise<TestCase[]> {
     // First, analyze the running application to understand its structure
@@ -228,10 +173,6 @@ Return a JSON array of test cases focusing on:
 
 Use practical CSS selectors and realistic user flows.`;
 
-        if (!this.openRouterClient) {
-          throw new Error('OpenRouter client not available in demo mode');
-        }
-        
         const response = await this.openRouterClient.chat([
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Page analysis: ${JSON.stringify(pageAnalysis, null, 2)}` }
@@ -240,138 +181,14 @@ Use practical CSS selectors and realistic user flows.`;
         const testCases = JSON.parse(response.content);
         return Array.isArray(testCases) ? testCases : [testCases];
       } catch (error) {
-        console.warn('Failed to generate AI test cases, using page analysis fallback');
-        return this.generateTestCasesFromPageAnalysis(pageAnalysis);
+        throw new Error(`Failed to generate automatic test cases: ${error instanceof Error ? error.message : String(error)}`);
       }
     } finally {
       await page.close();
     }
   }
 
-  private generateTestCasesFromPageAnalysis(pageAnalysis: any): TestCase[] {
-    const testCases: TestCase[] = [];
 
-    // Basic navigation test
-    testCases.push({
-      id: 'page_load',
-      name: 'Page Load Test',
-      description: 'Verify the application loads correctly',
-      steps: [
-        { action: 'navigate', target: '/', description: 'Navigate to home page' },
-        { action: 'check', target: 'body', description: 'Verify page body exists' },
-        { action: 'screenshot', description: 'Take homepage screenshot' }
-      ],
-      expectedResults: ['Page loads without errors'],
-      priority: 'high'
-    });
-
-    // Form testing if forms are present
-    if (pageAnalysis.forms && pageAnalysis.forms.length > 0) {
-      const form = pageAnalysis.forms[0];
-      const steps: TestStep[] = [
-        { action: 'navigate', target: '/', description: 'Navigate to home page' }
-      ];
-
-      // Add steps to fill form inputs
-      form.inputs.forEach((input: any, index: number) => {
-        if (input.type === 'email') {
-          steps.push({
-            action: 'fill',
-            target: `#${input.id}` || `input[name="${input.name}"]` || `input[type="email"]`,
-            value: 'test@example.com',
-            description: `Fill email field`
-          });
-        } else if (input.type === 'text') {
-          steps.push({
-            action: 'fill',
-            target: `#${input.id}` || `input[name="${input.name}"]` || `input[type="text"]`,
-            value: 'Test User',
-            description: `Fill text field`
-          });
-        } else if (input.type === 'TEXTAREA') {
-          steps.push({
-            action: 'fill',
-            target: `#${input.id}` || `textarea[name="${input.name}"]` || `textarea`,
-            value: 'This is a test message',
-            description: `Fill textarea field`
-          });
-        }
-      });
-
-      // Add submit step
-      steps.push({
-        action: 'click',
-        target: 'button[type="submit"], input[type="submit"]',
-        description: 'Submit the form'
-      });
-
-      steps.push({
-        action: 'wait',
-        timeout: 2000,
-        description: 'Wait for form processing'
-      });
-
-      testCases.push({
-        id: 'form_interaction',
-        name: 'Form Interaction Test',
-        description: 'Test form filling and submission',
-        steps,
-        expectedResults: ['Form submits successfully', 'No validation errors'],
-        priority: 'high'
-      });
-    }
-
-    // Button testing
-    if (pageAnalysis.buttons && pageAnalysis.buttons.length > 0) {
-      pageAnalysis.buttons.forEach((button: any, index: number) => {
-        if (button.text && button.text.length > 0) {
-          testCases.push({
-            id: `button_test_${index}`,
-            name: `Button Test: ${button.text}`,
-            description: `Test ${button.text} button functionality`,
-            steps: [
-              { action: 'navigate', target: '/', description: 'Navigate to home page' },
-              { 
-                action: 'click', 
-                target: button.id ? `#${button.id}` : `button:has-text("${button.text}")`,
-                description: `Click ${button.text} button`
-              },
-              { action: 'wait', timeout: 1000, description: 'Wait for button action' }
-            ],
-            expectedResults: ['Button click works without errors'],
-            priority: 'medium'
-          });
-        }
-      });
-    }
-
-    // Navigation testing
-    if (pageAnalysis.links && pageAnalysis.links.length > 0) {
-      const internalLinks = pageAnalysis.links.filter((link: any) => 
-        link.href && (link.href.startsWith('/') || link.href.includes('localhost'))
-      );
-
-      if (internalLinks.length > 0) {
-        testCases.push({
-          id: 'navigation_links',
-          name: 'Navigation Links Test',
-          description: 'Test internal navigation links',
-          steps: [
-            { action: 'navigate', target: '/', description: 'Start from home page' },
-            ...internalLinks.slice(0, 3).map((link: any, index: number) => ({
-              action: 'click' as const,
-              target: link.id ? `#${link.id}` : `a[href="${link.href}"]`,
-              description: `Click link: ${link.text || link.href}`
-            }))
-          ],
-          expectedResults: ['All internal links navigate correctly'],
-          priority: 'medium'
-        });
-      }
-    }
-
-    return testCases.length > 0 ? testCases : this.getFallbackTestCases();
-  }
 
   private async analyzePage(page: Page): Promise<any> {
     return await page.evaluate(() => {
@@ -413,57 +230,7 @@ Use practical CSS selectors and realistic user flows.`;
     });
   }
 
-  private getFallbackTestCases(): TestCase[] {
-    return [
-      {
-        id: 'basic_navigation',
-        name: 'Basic Navigation Test',
-        description: 'Verify the application loads and basic navigation works',
-        steps: [
-          {
-            action: 'navigate',
-            target: '/',
-            description: 'Navigate to home page'
-          },
-          {
-            action: 'screenshot',
-            description: 'Take screenshot of home page'
-          },
-          {
-            action: 'check',
-            target: 'body',
-            description: 'Verify page content loaded'
-          }
-        ],
-        expectedResults: ['Page loads successfully', 'No console errors'],
-        priority: 'high'
-      },
-      {
-        id: 'ui_elements',
-        name: 'UI Elements Test',
-        description: 'Check that essential UI elements are present and functional',
-        steps: [
-          {
-            action: 'navigate',
-            target: '/',
-            description: 'Navigate to home page'
-          },
-          {
-            action: 'check',
-            target: 'h1, h2, h3',
-            description: 'Verify headings are present'
-          },
-          {
-            action: 'check',
-            target: 'button, input[type="button"], input[type="submit"]',
-            description: 'Verify interactive elements exist'
-          }
-        ],
-        expectedResults: ['Essential UI elements are present'],
-        priority: 'medium'
-      }
-    ];
-  }
+
 
   async runTestCase(testCase: TestCase): Promise<TestCaseResult> {
     const page = await this.browserManager!.createPage();

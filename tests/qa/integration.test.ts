@@ -57,7 +57,7 @@ describe('QA Agent Integration Tests', () => {
       const blueprintPath = path.join(tempDir, 'blueprint.md');
       fs.writeFileSync(blueprintPath, blueprint);
 
-      const qaAgent = new QAAgent(tempDir, mockConfigManager, true); // Demo mode
+      const qaAgent = new QAAgent(tempDir, mockConfigManager);
       
       // Mock the server and browser managers to avoid actual browser/server startup
       qaAgent['browserManager'] = {
@@ -107,7 +107,7 @@ describe('QA Agent Integration Tests', () => {
       const blueprintPath = path.join(tempDir, 'blueprint.md');
       fs.writeFileSync(blueprintPath, blueprint);
 
-      const qaAgent = new QAAgent(tempDir, mockConfigManager, true);
+      const qaAgent = new QAAgent(tempDir, mockConfigManager);
       
       // Mock dependencies
       qaAgent['browserManager'] = {
@@ -120,19 +120,21 @@ describe('QA Agent Integration Tests', () => {
         stopServer: jest.fn()
       } as any;
 
-      // Mock test case generation
-      qaAgent['getPromptBasedFallbackTestCases'] = jest.fn().mockReturnValue([
-        {
-          id: 'custom_test',
-          name: 'Custom Test',
-          description: 'Custom test case',
-          steps: [
-            { action: 'navigate', target: '/', description: 'Navigate home' }
-          ],
-          expectedResults: ['Success'],
-          priority: 'high'
-        }
-      ]);
+      // Mock the OpenRouter client for test generation
+      qaAgent['openRouterClient'] = {
+        chat: jest.fn().mockResolvedValue({
+          content: JSON.stringify([{
+            id: 'custom_test',
+            name: 'Custom Test',
+            description: 'Custom test case',
+            steps: [
+              { action: 'navigate', target: '/', description: 'Navigate home' }
+            ],
+            expectedResults: ['Success'],
+            priority: 'high'
+          }])
+        })
+      } as any;
 
       // Mock test execution
       qaAgent['runTestCase'] = jest.fn().mockResolvedValue({
@@ -146,7 +148,7 @@ describe('QA Agent Integration Tests', () => {
       const result = await qaAgent.validateWithCustomPrompt('test the login form');
 
       expect(result).toBeDefined();
-      expect(qaAgent['getPromptBasedFallbackTestCases']).toHaveBeenCalledWith('test the login form');
+      expect(qaAgent['openRouterClient'].chat).toHaveBeenCalled();
     });
   });
 
@@ -158,7 +160,7 @@ describe('QA Agent Integration Tests', () => {
     });
 
     it('should cleanup resources on error', async () => {
-      const qaAgent = new QAAgent(tempDir, mockConfigManager, true);
+      const qaAgent = new QAAgent(tempDir, mockConfigManager);
       
       const mockBrowserManager = {
         initialize: jest.fn(),

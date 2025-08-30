@@ -6,10 +6,10 @@ The QA Agent is an intelligent testing system that automatically validates web a
 
 ## Key Features
 
-### 🤖 Intelligent Test Generation
-- Automatically analyzes web applications to generate relevant test cases
+### 🤖 AI-Powered Test Generation
+- Uses OpenRouter AI models to generate intelligent test cases
 - Supports custom test prompts for specific validation requirements
-- AI-powered test case creation based on page structure and functionality
+- Analyzes page structure and functionality to create targeted tests
 
 ### 🌐 Browser Automation
 - Built on Playwright for robust cross-browser testing
@@ -31,7 +31,7 @@ The QA Agent is an intelligent testing system that automatically validates web a
 ### 1. Standalone CLI Command
 
 ```bash
-# Run automatic QA validation
+# Run automatic QA validation (requires OpenRouter API key)
 orcode qa
 
 # Run with custom test prompt

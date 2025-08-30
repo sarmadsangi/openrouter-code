@@ -37,7 +37,7 @@ describe('QAAgent', () => {
       })
     } as any;
 
-    qaAgent = new QAAgent(tempDir, mockConfigManager, true); // Demo mode
+    qaAgent = new QAAgent(tempDir, mockConfigManager);
   });
 
   afterEach(() => {
@@ -88,27 +88,18 @@ describe('QAAgent', () => {
       };
     });
 
-    it('should generate fallback test cases in demo mode', () => {
-      const testCases = qaAgent['getFallbackTestCases']();
-      
-      expect(testCases).toHaveLength(2);
-      expect(testCases[0].name).toBe('Basic Navigation Test');
-      expect(testCases[1].name).toBe('UI Elements Test');
+    it('should require OpenRouter client for test generation', () => {
+      // Test that the QA agent requires AI for test generation
+      expect(qaAgent['openRouterClient']).toBeDefined();
     });
 
-    it('should generate prompt-based test cases', () => {
-      const testCases = qaAgent['getPromptBasedFallbackTestCases']('test the contact form');
-      
-      expect(testCases).toHaveLength(1);
-      expect(testCases[0].name).toBe('Form Validation Test');
-      expect(testCases[0].steps.some(step => step.action === 'fill')).toBe(true);
-    });
+    it('should handle test case generation errors gracefully', async () => {
+      // Mock the OpenRouter client to throw an error
+      qaAgent['openRouterClient'] = {
+        chat: jest.fn().mockRejectedValue(new Error('API error'))
+      } as any;
 
-    it('should generate navigation test cases for navigation prompts', () => {
-      const testCases = qaAgent['getPromptBasedFallbackTestCases']('test navigation menu');
-      
-      expect(testCases).toHaveLength(1);
-      expect(testCases[0].name).toBe('Navigation Test');
+      await expect(qaAgent['generateTestCasesFromPrompt']('test prompt')).rejects.toThrow('Failed to generate test cases from prompt');
     });
   });
 

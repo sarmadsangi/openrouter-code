@@ -22,11 +22,10 @@ export class QATool extends BaseTool {
         customPrompt,
         blueprintPath,
         workspacePath = process.cwd(),
-        mode = 'auto', // 'auto' | 'custom' | 'validate'
-        demo = false // Demo mode for testing without API keys
+        mode = 'auto' // 'auto' | 'custom' | 'validate'
       } = parameters;
 
-      const qaAgent = new QAAgent(workspacePath, this.configManager, demo);
+      const qaAgent = new QAAgent(workspacePath, this.configManager);
       
       let result;
       
