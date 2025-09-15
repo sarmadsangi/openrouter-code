@@ -20,7 +20,7 @@ export class ConversationManager {
   constructor(configManager: ConfigManager) {
     this.configManager = configManager;
     this.openRouterClient = new OpenRouterClient(configManager);
-    this.toolManager = new ToolManager(configManager.getConfig().allowedTools);
+    this.toolManager = new ToolManager(configManager.getConfig().allowedTools, configManager);
     this.taskPlanner = new TaskPlanner(configManager, this.toolManager);
     this.usageTracker = new UsageTracker();
     

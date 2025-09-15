@@ -1,0 +1,13 @@
+{
+  "name": "qa-test-app",
+  "version": "1.0.0",
+  "description": "Simple test application for QA agent validation",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.0"
+  }
+}

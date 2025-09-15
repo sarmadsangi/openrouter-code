@@ -6,12 +6,16 @@ import { BashTool } from './bash-tool';
 import { GrepTool } from './grep-tool';
 import { SearchTool } from './search-tool';
 import { WebSearchTool } from './web-search-tool';
+import { QATool } from './qa-tool';
+import { ConfigManager } from '../config';
 
 export class ToolManager {
   private tools: Map<Tool, BaseTool>;
+  private configManager: ConfigManager;
 
-  constructor(allowedTools: Tool[]) {
+  constructor(allowedTools: Tool[], configManager: ConfigManager) {
     this.tools = new Map();
+    this.configManager = configManager;
     this.initializeTools(allowedTools);
   }
 
@@ -22,13 +26,18 @@ export class ToolManager {
       'Bash': BashTool,
       'Grep': GrepTool,
       'Search': SearchTool,
-      'WebSearch': WebSearchTool
+      'WebSearch': WebSearchTool,
+      'QA': QATool
     };
 
     allowedTools.forEach(toolName => {
       const ToolClass = toolClasses[toolName];
       if (ToolClass) {
-        this.tools.set(toolName, new ToolClass());
+        if (toolName === 'QA') {
+          this.tools.set(toolName, new (ToolClass as any)(this.configManager));
+        } else {
+          this.tools.set(toolName, new (ToolClass as any)());
+        }
       }
     });
   }
